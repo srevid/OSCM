@@ -8,16 +8,15 @@ import spotipy
 import spotipy.oauth2 as oauth2
 import spotipy.util as util
 import os
+import timeit
+
+from lib.infos import InfosScript 
 
 # spotify:user:118679623:playlist:4ehKkbzdRgtjn0YK2c7on2
 
 os.environ['SPOTIPY_CLIENT_ID']='371af5b9ee7146b6b2c038195a54e06a'
 os.environ['SPOTIPY_CLIENT_SECRET']='352f23c6be3148de82b19e7ccc711d61'
 os.environ['SPOTIPY_REDIRECT_URI']='http://localhost:8080'
-
-def infoScript(timeEntry):
-    delay = time.time() - timeEntry
-    print(datetime.datetime.fromtimestamp(delay).strftime('temps script: %S,%f secondes'))
 
 def connectReddit():
     reddit_client_id = "mKrZFZXOr3zi7w"
@@ -67,15 +66,17 @@ def extractArtistTrackData(rg,title):
     for match in rg.finditer(title):
         return(match.group(1)+" "+match.group(2))
 
+
 reddit = connectReddit()
 spotify = connectSpotify()
 spotifyUser = connectSpotifyUser()
 
-is_timeEntry = time.time()
-
 rgExtract = re.compile('(.+(?=)) - (.+(?=))')
 rgCleanDate = re.compile('(\\(.*\\))')
 rgYoutube = re.compile('^(http(s)?:\/\/)?((w){3}.)?youtu(be|.be)?(\.com)?\/.+')
+
+infos = InfosScript()
+infos.infosScriptExec_init()
 
 for submission in list(reddit.subreddit('OldSchoolCoolMusic').top('week')):
         try:
@@ -93,10 +94,10 @@ for submission in list(reddit.subreddit('OldSchoolCoolMusic').top('week')):
                             uriTrackSpotify = searchUriSpotify(spotify,artistTrack)
                             if(uriTrackSpotify):
                                 print(uriTrackSpotify)
-                                addTrackSpotify(spotifyUser,uriTrackSpotify)
+                                # addTrackSpotify(spotifyUser,uriTrackSpotify)
 
         except ValueError:
             print("Oops!  That was no valid entry.  Try again...")
 
 print(len(list(reddit.subreddit('OldSchoolCoolMusic').top('week'))))
-infoScript(is_timeEntry)
+infos.infosScriptExec()
