@@ -23,14 +23,12 @@ class Main:
     def start(self):
         self.infos.infosScriptExec_init()
         listPost = list(self.reddit.subreddit('OldSchoolCoolMusic').top('week'))
-        for submission in listPost:
             
-
-    def postHaveScoreRequire(post):
+    def postHaveScoreRequire(self,post):
         if(post.score > 10):
-            return true
-        else
-            return false
+            return True
+        else:
+            return False
 
     def connectReddit(self):
         reddit_client_id = "mKrZFZXOr3zi7w"
