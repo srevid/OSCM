@@ -55,8 +55,8 @@ class Main:
                     # print(artistTrack,"\n",uriTrackSpotify)
                     if not self.findDouble(uriTrackSpotify,self.oscmTracks):
                         self.addTrackSpotify(uriTrackSpotify,self.oscmPlaylist)
-                except ValueError:
-                    self.postWithErros.append(post.title)
+                except ValueError as er:
+                    self.postWithErros.append({post.title,er})
                     pass
         print("\n")
         self.displayPlaylist(self.oscmTracks)
@@ -70,6 +70,8 @@ class Main:
         print(" %s %s" % ("tracks added|",len(self.tracksAddToPlaylist)))
         print(" %s %s" % ("tracks already exist|",len(self.tracksAlReadyExist)))
         print(" %s %s" % ("post with errors|",len(self.postWithErros)))
+        print("")
+        pprint(self.postWithErros)
         print("")
         self.infos.infosScriptExec()       
         print("")
