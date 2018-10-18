@@ -77,7 +77,7 @@ rgYoutube = re.compile('^(http(s)?:\/\/)?((w){3}.)?youtu(be|.be)?(\.com)?\/.+')
 
 infos = InfosScript()
 infos.infosScriptExec_init()
-
+print(list(reddit.subreddit('OldSchoolCoolMusic').top('week')))
 for submission in list(reddit.subreddit('OldSchoolCoolMusic').top('week')):
         try:
             if(submission.score > 10):
