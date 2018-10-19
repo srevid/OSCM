@@ -1,0 +1,2 @@
+import spotipy
+spotipy.__version__

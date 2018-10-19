@@ -22,8 +22,11 @@ class Main:
     rgYoutube = re.compile('^(http(s)?:\/\/)?((w){3}.)?youtu(be|.be)?(\.com)?\/.+')
 
     username = '118679623'
+    spotifyPlaylistName = "r/OldSchoolCoolMusic"
+    spotifyPlaylistNameBck = "r/OldSchoolCoolMusic-backup"
 
     def __init__(self):
+
 
         #infos
         self.infos = InfosScript()
@@ -42,36 +45,28 @@ class Main:
         self.postWithErros = list()
 
         self.infos.infosScriptExec_init()
-        self.oscmTracks = self.getPlaylistTracks("r/OldSchoolCoolMusic")
-        self.oscmPlaylist = self.getPlaylist("r/OldSchoolCoolMusic")
+        self.oscmTracks = self.getPlaylistTracks(self.spotifyPlaylistName)
+        self.oscmPlaylist = self.getPlaylist(self.spotifyPlaylistName)
         
-        listPost = list(self.reddit.subreddit('OldSchoolCoolMusic').top('week'))
-        for post in listPost:
+        self.listPost = list(self.reddit.subreddit('OldSchoolCoolMusic').top('week'))
+        for post in self.listPost:
             if(self.respectRequirements(post)):
                 try:
                     cleanSubTitle = self.cleanDateLink(post.title)
                     artistTrack = self.extractArtistTrackData(cleanSubTitle)
                     uriTrackSpotify = self.searchUriSpotify(self.spotify,artistTrack)
-                    # print(artistTrack,"\n",uriTrackSpotify)
                     if not self.findDouble(uriTrackSpotify,self.oscmTracks):
-                        self.addTrackSpotify(uriTrackSpotify,self.oscmPlaylist)
+                        pass
+                        # self.addTrackSpotify(uriTrackSpotify,self.oscmPlaylist)
                 except ValueError as er:
-                    self.postWithErros.append({post.title,er})
+                    self.postWithErros.append({"id":post.id,"title":post.title,"error":er})
                     pass
         print("\n")
-        self.displayPlaylist(self.oscmTracks)
-        print("\n-----------------------------------------------------------------------")
-        print(" %s %s" % ("playlist |",self.oscmPlaylist['name']))
-        print(" %s %s" % ("posts find|",len(listPost)))
-        print(" %s %s" % ("posts = tracks|",len(self.postsAreTracks)))
-        print(" %s %s" % ("posts != tracks|",len(self.postsNotTracks)))
-        print(" %s %s" % ("posts.score < 10|",len(self.postsNotHaveScore)))
-        print(" %s %s" % ("posts no respect requirements|",len(self.postsNotRespectRequirements)))       
-        print(" %s %s" % ("tracks added|",len(self.tracksAddToPlaylist)))
-        print(" %s %s" % ("tracks already exist|",len(self.tracksAlReadyExist)))
-        print(" %s %s" % ("post with errors|",len(self.postWithErros)))
+        self.printPlaylist(self.oscmTracks)
         print("")
-        pprint(self.postWithErros)
+        self.printReport()
+        print("")
+        self.printErrors()
         print("")
         self.infos.infosScriptExec()       
         print("")
@@ -179,6 +174,7 @@ class Main:
         if(len(items) > 0):
             if(id not in items[0]):
                 return(items[0]['uri'])
+        raise ValueError(search+"\n"+"URI not found")
 
     def addTrackSpotify(self,uriTrack,playlist):
         if not uriTrack:
@@ -187,27 +183,70 @@ class Main:
         self.tracksAddToPlaylist.append(uriTrack)
         self.spotifyUser.user_playlist_add_tracks('118679623', playlist['id'], [uriTrack])
 
-    def displayPlaylist(self,playlist):
+    # def backupPlaylist(self):
+    #     playlist = self.getPlaylist(self.spotifyPlaylistNameBck)
+    #     if not playlist:
+    #         playlist = self.spotify.user_playlist_create(self.username, self.spotifyPlaylistNameBck,True)
+        
+        #check if bckplaylist already exist
+        #create bckplaylist if not exist
+        #flush playlist if exist
+        #add track to playlist
+    
+
+#############################################################################################
+#REGEX PROCESS
+
+    def cleanDateLink(self,title):
+        if not title:
+            raise ValueError("title is null or empty ")
+
+        title = self.replaceBadChars(title)
+        return self.rgCleanDate.sub("",title)
+
+    def replaceBadChars(self,title):
+        title = title.replace("—","-")
+        return title
+
+    def extractArtistTrackData(self,title):
+        if not title:
+            raise ValueError("title is null or empty ")
+
+        iteratorObj = self.rgExtract.finditer(title)
+        if( sum(1 for _ in iteratorObj) == 0):
+            raise ValueError(title+"\n"+"Impossible d'extraire le titre ou l'artiste")
+
+        for match in self.rgExtract.finditer(title):
+            search = match.group(1)+" "+match.group(2)
+            return search
+#############################################################################################
+#OUTPUT FUNCTIONS
+    def printReport(self):
+        print("#REPORT:")
+        print("-----------------------------------------------------------------------")
+        print(" %s %s" % ("playlist |",self.oscmPlaylist['name']))
+        print(" %s %s" % ("posts find|",len(self.listPost)))
+        print(" %s %s" % ("posts = tracks|",len(self.postsAreTracks)))
+        print(" %s %s" % ("posts != tracks|",len(self.postsNotTracks)))
+        print(" %s %s" % ("posts.score < 10|",len(self.postsNotHaveScore)))
+        print(" %s %s" % ("posts no respect requirements|",len(self.postsNotRespectRequirements)))       
+        print(" %s %s" % ("tracks added|",len(self.tracksAddToPlaylist)))
+        print(" %s %s" % ("tracks already exist|",len(self.tracksAlReadyExist)))
+        print(" %s %s" % ("post with errors|",len(self.postWithErros)))
+
+    def printErrors(self):
+        print("#ERROS:")
+        print("-----------------------------------------------------------------------")
+        for errors in self.postWithErros:
+            print(str(errors["error"])+"\n")
+
+    def printPlaylist(self,playlist):
+        print("#PLAYLIST CONTENT:")
+        print("-----------------------------------------------------------------------")
         print("Current playlist tracks (title)")
         for i, item in enumerate(playlist['items']):
             track = item['track']
             print(" %2.5s %1s %1s" % (i, track['artists'][0]['name'],track['name']))
-
-#############################################################################################
-    #REGEX PROCESS
-
-    def cleanDateLink(self,title):
-        if not title:
-            raise ValueError("@title is null or empty")
-
-        return self.rgCleanDate.sub("",title)
-
-    def extractArtistTrackData(self,title):
-        if not title:
-            raise ValueError("@title is null or empty")
-
-        for match in self.rgExtract.finditer(title):
-            return(match.group(1)+" "+match.group(2))
 
 
 main = Main()
