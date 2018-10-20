@@ -1,11 +1,11 @@
+import sys
 import praw
 import re
-import spotipy
-import spotipy.oauth2 as oauth2
-import spotipy.util as util
 import os
-import sys
 import datetime
+sys.path.insert(0, '/spotipy/')
+import spotipy
+from spotipy import oauth2, util
 from pprint import pprint
 from lib.infos import InfosScript
 
@@ -36,6 +36,7 @@ class Main:
         self.spotify = self.connectSpotify()
         self.spotifyUser = self.connectSpotifyUser()
 
+        #report
         self.postsAreTracks = list()
         self.postsNotTracks = list()
         self.postsNotRespectRequirements = list()
@@ -47,8 +48,11 @@ class Main:
         self.infos.infosScriptExec_init()
         self.oscmTracks = self.getPlaylistTracks(self.spotifyPlaylistName)
         self.oscmPlaylist = self.getPlaylist(self.spotifyPlaylistName)
-        
-        self.listPost = list(self.reddit.subreddit('OldSchoolCoolMusic').top('week'))
+        self.oscmTracksUri = self.getPlaylistTracksUri(self.spotifyPlaylistName)
+
+        self.backupPlaylist(self.spotifyPlaylistName,self.spotifyPlaylistNameBck)
+
+        self.listPost = list(self.reddit.subreddit('OldSchoolCoolMusic').top(limit=1000))
         for post in self.listPost:
             if(self.respectRequirements(post)):
                 try:
@@ -119,7 +123,7 @@ class Main:
     def matchYoutubeLink(self,post):
         if not post:
             raise ValueError("link is null or empty")
-
+        
         m = self.rgYoutube.search(post.url)
         if m:
             self.postsAreTracks.append(post)
@@ -129,6 +133,18 @@ class Main:
             return False
 #############################################################################################
 #SPOTIFY TOOLS
+    def getPlaylistTracksUri(self,playlist_name):
+        if not playlist_name:
+            raise ValueError("playlist is null or empty")
+        
+        listTracksUri = list()
+        playlists = self.getPlaylistTracks(playlist_name)
+        for item in playlists['items']:
+            listTracksUri.append(item['track']['uri'])
+
+        return listTracksUri
+
+
     def getPlaylistTracks(self,playlist_name):
         if not playlist_name:
             raise ValueError("playlist is null or empty")
@@ -139,8 +155,6 @@ class Main:
                 results = self.spotify.user_playlist(self.username, playlist['id'],fields="tracks,next")
                 return results['tracks']
 
-        raise ValueError("Playlist not find in spotify user playlists")
-
     def getPlaylist(self,playlist_name):
         if not playlist_name:
             raise ValueError("playlist is null or empty")
@@ -150,15 +164,13 @@ class Main:
             if(playlist['name'] == playlist_name):
                 return playlist
 
-        raise ValueError("Playlist not find in spotify user playlists")
-
     def findDouble(self,uri,playlist):
         if not uri:
             raise ValueError("Uri is null or empty")
         if not playlist:
             raise ValueError("playlist is null or empty")
 
-        for i,item in enumerate(playlist['items']):
+        for item in playlist['items']:
             track = item['track']
             if(str(track['uri']) == uri):
                 self.tracksAlReadyExist.append(uri)
@@ -171,27 +183,26 @@ class Main:
 
         results = self.spotify.search(q=search,type='artist,track',limit=1)
         items = results['tracks']['items']
-        if(len(items) > 0):
-            if(id not in items[0]):
-                return(items[0]['uri'])
-        raise ValueError(search+"\n"+"URI not found")
+        if items:
+            return(items[0]['uri'])
+        raise ValueError(search+"\nURI not found")
 
     def addTrackSpotify(self,uriTrack,playlist):
         if not uriTrack:
             raise ValueError("URI is null or empty")
 
         self.tracksAddToPlaylist.append(uriTrack)
-        self.spotifyUser.user_playlist_add_tracks('118679623', playlist['id'], [uriTrack])
+        self.spotifyUser.user_playlist_add_tracks(self.username, playlist['id'], [uriTrack])
 
-    # def backupPlaylist(self):
-    #     playlist = self.getPlaylist(self.spotifyPlaylistNameBck)
-    #     if not playlist:
-    #         playlist = self.spotify.user_playlist_create(self.username, self.spotifyPlaylistNameBck,True)
+    def backupPlaylist(self,playlist_name,playlist_name_bck):
+        playlistTracksUri = self.getPlaylistTracksUri(playlist_name)
+        playlistBackUp = self.getPlaylist(playlist_name_bck)
+
+        if playlistBackUp:
+            self.spotifyUser.user_playlist_unfollow(self.username,playlistBackUp['id'])
         
-        #check if bckplaylist already exist
-        #create bckplaylist if not exist
-        #flush playlist if exist
-        #add track to playlist
+        playlistBackUp = self.spotifyUser.user_playlist_create(self.username, playlist_name_bck,True)
+        self.spotifyUser.user_playlist_add_tracks(self.username,playlistBackUp['id'],playlistTracksUri)
     
 
 #############################################################################################
