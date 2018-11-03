@@ -17,26 +17,35 @@ class Main:
 
     #regex 
     #use http://txt2re.com/ to find regex online
-    rgExtract = re.compile('(.+(?=)) - (.+(?=))')
-    rgCleanDate = re.compile('(\\(.*\\))')
+    rgExtract = re.compile('(.+(?=))-(.+(?=))')
+    rgCleanDate = re.compile('(\[.*\]|\(.*\))') #supprime les années (1999) et [1999]
     rgYoutube = re.compile('^(http(s)?:\/\/)?((w){3}.)?youtu(be|.be)?(\.com)?\/.+')
 
     username = '118679623'
     spotifyPlaylistName = "r/OldSchoolCoolMusic"
-    spotifyPlaylistNameBck = "r/OldSchoolCoolMusic-backup"
+    spotifyPlaylistNameBck = spotifyPlaylistName+"-backup"
 
     def __init__(self):
+        self.main()
 
+        
+#############################################################################################
+#MAIN
+    def main(self):
+       self.infos = InfosScript()
+       self.mainConnectClient()
+       self.mainDeclare()
+       self.debugPostReddit()
+    #    self.mainProcess()
+    #    self.mainPrint()
 
-        #infos
-        self.infos = InfosScript()
-
-        #client
+    #client
+    def mainConnectClient(self):
         self.reddit = self.connectReddit()
         self.spotify = self.connectSpotify()
         self.spotifyUser = self.connectSpotifyUser()
 
-        #report
+    def mainDeclare(self):
         self.postsAreTracks = list()
         self.postsNotTracks = list()
         self.postsNotRespectRequirements = list()
@@ -44,33 +53,41 @@ class Main:
         self.tracksAddToPlaylist = list()
         self.tracksAlReadyExist = list()
         self.postWithErros = list()
+        self.listPost = list()
 
+    #process
+    def mainProcess(self):
         self.infos.infosScriptExec_init()
         self.oscmTracks = self.getPlaylistTracks(self.spotifyPlaylistName)
-        self.oscmPlaylist = self.getPlaylist(self.spotifyPlaylistName)
-        self.oscmTracksUri = self.getPlaylistTracksUri(self.spotifyPlaylistName)
-
+        self.oscmPlaylist = self.getPlaylist(self.spotifyPlaylistName,True)
+        self.oscmPlaylistTracksUri = self.getPlaylistTracksUri(self.spotifyPlaylistName)
         self.backupPlaylist(self.spotifyPlaylistName,self.spotifyPlaylistNameBck)
 
-        self.listPost = list(self.reddit.subreddit('OldSchoolCoolMusic').top(limit=1000))
+        # self.listPost = list(self.reddit.subreddit('OldSchoolCoolMusic').top(limit=5000))
+        # self.listPost = list(self.reddit.subreddit('OldSchoolCoolMusic').top("month"))
+        self.listPost = list(self.reddit.subreddit('OldSchoolCoolMusic').top("week"))
         for post in self.listPost:
             if(self.respectRequirements(post)):
                 try:
                     cleanSubTitle = self.cleanDateLink(post.title)
                     artistTrack = self.extractArtistTrackData(cleanSubTitle)
                     uriTrackSpotify = self.searchUriSpotify(self.spotify,artistTrack)
-                    if not self.findDouble(uriTrackSpotify,self.oscmTracks):
-                        pass
-                        # self.addTrackSpotify(uriTrackSpotify,self.oscmPlaylist)
+                    if not self.findDouble(uriTrackSpotify,self.oscmPlaylistTracksUri):
+                        self.addTrackSpotify(uriTrackSpotify,self.oscmPlaylist)
                 except ValueError as er:
                     self.postWithErros.append({"id":post.id,"title":post.title,"error":er})
                     pass
+
+    #print
+    def mainPrint(self):
         print("\n")
-        self.printPlaylist(self.oscmTracks)
+        self.printPlaylist(self.spotifyPlaylistName)
         print("")
         self.printReport()
         print("")
         self.printErrors()
+        print("")
+        self.printDoubleTest(self.spotifyPlaylistName)
         print("")
         self.infos.infosScriptExec()       
         print("")
@@ -78,10 +95,24 @@ class Main:
 
 #############################################################################################
 #DEBUG
+    def debugPostReddit(self):
+        # self.listPost = list(self.reddit.subreddit('OldSchoolCoolMusic').top(limit=1000))
+        # self.listPost = list(self.reddit.subreddit('OldSchoolCoolMusic').top("month"))
+        self.listPost = list(self.reddit.subreddit('OldSchoolCoolMusic').top("week"))
+        for post in self.listPost:
+            if(self.respectRequirements(post)):
+                try:
+                    cleanSubTitle = self.cleanDateLink(post.title)
+                    artistTrack = self.extractArtistTrackData(cleanSubTitle)
+                    print(post.title)
+                    print(cleanSubTitle)
+                    print(artistTrack)
+                except ValueError as er:
+                    self.postWithErros.append({"id":post.id,"title":post.title,"error":er})
+                    pass
 #             
 #############################################################################################
 #CONNEXIONS
-
     def connectReddit(self):
         reddit_client_id = "mKrZFZXOr3zi7w"
         reddit_client_secret = "cXDR5UMAo2hf8VZObYfgjPrH-TE"
@@ -135,27 +166,43 @@ class Main:
 #SPOTIFY TOOLS
     def getPlaylistTracksUri(self,playlist_name):
         if not playlist_name:
-            raise ValueError("playlist is null or empty")
+            raise ValueError("playlist params is null or empty")
         
         listTracksUri = list()
-        playlists = self.getPlaylistTracks(playlist_name)
-        for item in playlists['items']:
-            listTracksUri.append(item['track']['uri'])
+        try:
+            playlists = self.getPlaylistTracks(playlist_name,"items(track(uri))")
+            for item in playlists:
+                listTracksUri.append(item['track']['uri'])
+            return listTracksUri
+        except:
+            return list()
 
-        return listTracksUri
 
-
-    def getPlaylistTracks(self,playlist_name):
+    def getPlaylistTracks(self,playlist_name,fields=""):
         if not playlist_name:
             raise ValueError("playlist is null or empty")
 
-        playlists = self.spotify.user_playlists(self.username)
-        for playlist in playlists['items']:
-            if(playlist['name'] == playlist_name):
-                results = self.spotify.user_playlist(self.username, playlist['id'],fields="tracks,next")
-                return results['tracks']
+        playlist = self.getPlaylist(playlist_name,False)
+        totalTrackRemaining = playlist['tracks']['total']
+        trackOffset = 0
+        playlistTracks = []
+        while(totalTrackRemaining > 0):
+            limit = 100
 
-    def getPlaylist(self,playlist_name):
+            if(totalTrackRemaining < limit):
+                limit = totalTrackRemaining
+            
+            playlistTracks = playlistTracks + self.spotify.user_playlist_tracks(
+                    self.username, 
+                    playlist['id'],
+                    fields=fields,
+                    limit=limit,
+                    offset=trackOffset)['items']    
+            trackOffset += limit
+            totalTrackRemaining -= limit
+        return playlistTracks
+
+    def getPlaylist(self,playlist_name,create):
         if not playlist_name:
             raise ValueError("playlist is null or empty")
 
@@ -163,6 +210,9 @@ class Main:
         for playlist in playlists['items']:
             if(playlist['name'] == playlist_name):
                 return playlist
+        #if not found, create playlist
+        if create:
+            self.spotifyUser.user_playlist_create(self.username, playlist_name,True)
 
     def findDouble(self,uri,playlist):
         if not uri:
@@ -170,12 +220,11 @@ class Main:
         if not playlist:
             raise ValueError("playlist is null or empty")
 
-        for item in playlist['items']:
-            track = item['track']
-            if(str(track['uri']) == uri):
-                self.tracksAlReadyExist.append(uri)
-                return True
-        return False
+        if uri in playlist:
+            self.tracksAlReadyExist.append(uri)
+            return True
+        else:
+            return False
 
     def searchUriSpotify(self,spotify,search):
         if not search:
@@ -196,13 +245,43 @@ class Main:
 
     def backupPlaylist(self,playlist_name,playlist_name_bck):
         playlistTracksUri = self.getPlaylistTracksUri(playlist_name)
-        playlistBackUp = self.getPlaylist(playlist_name_bck)
+        self.flushPlaylist(playlist_name_bck)
+        playlistBackUp = self.spotifyUser.user_playlist_create(self.username, playlist_name_bck,True)
 
+        limit = 99
+        if playlistTracksUri:
+            while(len(playlistTracksUri) > 0):
+                if(len(playlistTracksUri) > limit):
+                    tracksToAdd = playlistTracksUri[0:limit]
+                    del playlistTracksUri[0:limit]
+                else:
+                    lastIndex = len(playlistTracksUri)
+                    tracksToAdd = playlistTracksUri[0:lastIndex]
+                    del playlistTracksUri[0:lastIndex]
+                self.spotifyUser.user_playlist_add_tracks(self.username,playlistBackUp['id'],tracksToAdd)
+        print("Backup of "+playlist_name+" to "+playlist_name_bck+" done !")
+            
+
+    def flushPlaylist(self,playlist_name):
+        playlistBackUp = self.getPlaylist(playlist_name,False)
         if playlistBackUp:
             self.spotifyUser.user_playlist_unfollow(self.username,playlistBackUp['id'])
+
+    def searchDoubleInPlaylist(self,playlist_name):
+        playlistTrackURI = self.getPlaylistTracks(playlist_name)
+        seen = set()
+        double = []
+        uniq = []
+        for item in playlistTrackURI:
+            track = item['track']
+            uri = item['track']['uri']
+            if uri not in seen:
+                uniq.append(uri)
+                seen.add(uri)
+            else:
+                double.append(track)
+        return double
         
-        playlistBackUp = self.spotifyUser.user_playlist_create(self.username, playlist_name_bck,True)
-        self.spotifyUser.user_playlist_add_tracks(self.username,playlistBackUp['id'],playlistTracksUri)
     
 
 #############################################################################################
@@ -246,18 +325,30 @@ class Main:
         print(" %s %s" % ("post with errors|",len(self.postWithErros)))
 
     def printErrors(self):
-        print("#ERROS:")
+        print("#ERRORS:")
         print("-----------------------------------------------------------------------")
         for errors in self.postWithErros:
-            print(str(errors["error"])+"\n")
+            try:
+                print('%s\n' % errors["error"])
+            except:
+                print('%s\n' % str(errors["error"]).encode())
 
-    def printPlaylist(self,playlist):
+    def printPlaylist(self,playlist_name): 
+        playlistTracks = self.getPlaylistTracks(playlist_name)
         print("#PLAYLIST CONTENT:")
         print("-----------------------------------------------------------------------")
-        print("Current playlist tracks (title)")
-        for i, item in enumerate(playlist['items']):
+        print("Current playlist tracks (title) (len:"+str(len(playlistTracks))+")")
+        for i, item in enumerate(playlistTracks):
             track = item['track']
-            print(" %2.5s %1s %1s" % (i, track['artists'][0]['name'],track['name']))
+            try:
+                print(" %2.5s %1s - %1s" % (i, track['artists'][0]['name'],track['name']))
+            except:
+                print(" %2.5s %1s - %1s" % (i, track['artists'][0]['name'].encode(),track['name'].encode()))
 
-
+    def printDoubleTest(self,playlist_name):
+        playlistTracksDouble = self.searchDoubleInPlaylist(playlist_name)
+        print("#DOUBLE:")
+        print("-----------------------------------------------------------------------")
+        for track in playlistTracksDouble:
+            print("%0s (%0s) " % (track['name'],track['uri']))
 main = Main()
