@@ -35,9 +35,9 @@ class Main:
        self.infos = InfosScript()
        self.mainConnectClient()
        self.mainDeclare()
-       self.debugPostReddit()
-    #    self.mainProcess()
-    #    self.mainPrint()
+    #    self.debugPostReddit()
+       self.mainProcess()
+       self.mainPrint()
 
     #client
     def mainConnectClient(self):
