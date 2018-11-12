@@ -25,19 +25,40 @@ class Main:
     addTracks = True
     needBackup = True
     scoreToReach = 10
-    showErrors = False
+    terminalErrors = False
+    terminalContent = False
     limitSearch = "week" #"week"|"month"|"year"|100
+
+    logFilePath = "./report/logs.txt"
+    errorsFilePath = "./report/errors.txt"
     
     userID = '118679623'
-    playlistSubredditName = "ClassicRock" #"OldSchoolCoolMusic"
-    spotifyPlaylistName = "/r/"+playlistSubredditName
-    spotifyPlaylistNameBck = spotifyPlaylistName+"-backup"
-    spotifyPlaylistDescription = "The https://www.reddit.com/r/"+playlistSubredditName+" playlist ! The playlist is automatically populated every week from the submissions that reaches a score of "+str(scoreToReach)+" or more.**LAST UPDATE: "+dateTimeNow.strftime("%m/%d/%Y")+"**"
+    listPlaylistSubredditName = ['ClassicRock','OldSchoolCoolMusic']
         
 
     def __init__(self):
         self.main()
+#############################################################################################
+#LOGS
+    def writeLogsAndErrors(self):
+        with open(self.logFilePath, "a") as logsFile:
+            logsFile.write(self.logs)
+        with open(self.errorsFilePath, "a") as errorsFile:
+            errorsFile.write(self.errors)
+    
+    def writeEndOfFile(self):
+        with open(self.logFilePath, "a") as logsFile:
+            logsFile.write("***********************************************************************\n")
+            logsFile.write("**** END OF MAIN PROCESS \n")
+            logsFile.write("**** DATE:"+self.dateTimeNow.strftime("%m/%d/%Y")+"\n")
+            logsFile.write("***********************************************************************\n")
+        with open(self.errorsFilePath, "a") as errorsFile:
+            errorsFile.write("***********************************************************************\n")
+            errorsFile.write("**** END OF MAIN PROCESS \n")
+            errorsFile.write("**** DATE:"+self.dateTimeNow.strftime("%m/%d/%Y")+"\n")
+            errorsFile.write("***********************************************************************\n")
 
+    
 #############################################################################################
 #DEBUG
     def debugPostReddit(self):
@@ -51,18 +72,25 @@ class Main:
                     print(cleanSubTitle+ "| clean pass")
                     print(artistTrack+ "| artist/track pass")
                 except ValueError as er:
-                    self.postWithErros.append({"id":post.id,"title":post.title,"error":er})
+                    self.postWithErrors.append({"id":post.id,"title":post.title,"error":er})
                     pass
 #        
 #############################################################################################
 #MAIN
     def main(self):
-       self.infos = InfosScript()
-       self.mainConnectClient()
-       self.mainDeclare()
-    #    self.debugPostReddit()
-       self.mainProcess()
-       self.mainPrint()
+        self.infos = InfosScript()
+        self.mainConnectClient()        
+        for playlist in self.listPlaylistSubredditName:
+            self.mainDeclare()
+            self.playlistSubredditName = playlist
+            self.spotifyPlaylistName = "/r/"+self.playlistSubredditName
+            self.spotifyPlaylistNameBck = self.spotifyPlaylistName+"-backup"
+            self.spotifyPlaylistDescription = "The https://www.reddit.com/r/"+self.playlistSubredditName+" playlist ! The playlist is automatically populated every week from the submissions that reaches a score of "+str(self.scoreToReach)+" or more.**LAST UPDATE: "+self.dateTimeNow.strftime("%m/%d/%Y")+"**"
+            self.mainProcess()
+            self.mainPrint()
+            self.LogAndPrint("---- END OF "+self.playlistSubredditName.upper()+" PROCESS")
+            self.writeLogsAndErrors()
+        self.writeEndOfFile()
 
     #client
     def mainConnectClient(self):
@@ -70,6 +98,7 @@ class Main:
         self.spotify = self.connectSpotify()
         self.spotifyUser = self.connectSpotifyUser()
 
+    #variables
     def mainDeclare(self):
         self.postsAreYoubube = list()
         self.postsAreNotYoubube = list()
@@ -80,8 +109,10 @@ class Main:
         self.tracksCanBeAddToPlaylist = list()
         self.tracksAddedToPlaylist = list()
         self.tracksAlReadyExist = list()
-        self.postWithErros = list()
+        self.postWithErrors = list()
         self.listPost = list()
+        self.logs = ""
+        self.errors = ""
 
     #process
     def mainProcess(self):
@@ -106,25 +137,23 @@ class Main:
                     if not self.findDouble(uriTrackSpotify,self.oscmPlaylistTracksUri):
                         self.addTrackSpotify(uriTrackSpotify,self.oscmPlaylist)
                 except ValueError as er:
-                    self.postWithErros.append({"id":post.id,"title":post.title,"error":er})
+                    self.postWithErrors.append({"id":post.id,"title":post.title,"error":er})
                     pass
         self.playlistTracksDouble = self.searchDoubleInPlaylist(self.spotifyPlaylistName)
 
     #print
     def mainPrint(self):
-        print("\n")
-        self.printPlaylist(self.spotifyPlaylistName)
-        print("")
+        self.LogAndPrint("\n")
+        self.printPlaylistContent(self.spotifyPlaylistName)
+        self.LogAndPrint("")
         self.printReport()
-        if self.showErrors:
-            print("")
-            self.printErrors()
-        print("")
+        self.LogAndPrint("")
+        self.printErrors()
+        self.LogAndPrint("")
         self.printDoubleTest(self.spotifyPlaylistName)
-        print("")
+        self.LogAndPrint("")
         self.infos.infosScriptExec()       
-        print("")
-
+        self.LogAndPrint("")
 
            
 #############################################################################################
@@ -299,7 +328,7 @@ class Main:
                     tracksToAdd = playlistTracksUri[0:lastIndex]
                     del playlistTracksUri[0:lastIndex]
                 self.spotifyUser.user_playlist_add_tracks(self.userID,playlistBackUp['id'],tracksToAdd)
-        print("Backup of "+playlist_name+" to "+playlist_name_bck+" done !")
+        self.LogAndPrint("Backup of "+playlist_name+" to "+playlist_name_bck+" done !")
             
 
     def flushPlaylist(self,playlist_name):
@@ -348,64 +377,75 @@ class Main:
 #############################################################################################
 #OUTPUT FUNCTIONS
     def printReport(self):
-        print("#REPORT:")
-        print("-----------------------------------------------------------------------")
-        print(" %s %s" % ("playlist |",self.oscmPlaylist['name']))
-        print(" %s %s" % ("posts find|",len(self.listPost)))
-        print(" %s %s" % ("posts = youtube|",len(self.postsAreYoubube)))
-        print(" %s %s" % ("posts != youbue|",len(self.postsAreNotYoubube)))
-        print(" %s %s" % ("title = track|",len(self.postsTitleMatch)))
-        print(" %s %s" % ("title != track|",len(self.postsTitleNotMatch)))
-        print(" %s %s" % ("posts.score < 10|",len(self.postsNotHaveScore)))
-        print(" %s %s" % ("posts no respect requirements|",len(self.postsNotRespectRequirements)))       
-        print(" %s %s" % ("tracks can be add|",len(self.tracksCanBeAddToPlaylist)))
-        print(" %s %s" % ("tracks added|",len(self.tracksAddedToPlaylist)))
-        print(" %s %s" % ("tracks already exist|",len(self.tracksAlReadyExist)))
-        print(" %s %s" % ("post with errors|",len(self.postWithErros)))
-        print(" %s %s" % ("tracks in double|",len(self.playlistTracksDouble)))
+        self.LogAndPrint("#REPORT:")
+        self.LogAndPrint("-----------------------------------------------------------------------")
+        self.LogAndPrint(" %s %s" % ("playlist |",self.oscmPlaylist['name']))
+        self.LogAndPrint(" %s %s" % ("posts find|",len(self.listPost)))
+        self.LogAndPrint(" %s %s" % ("posts no respect requirements|",len(self.postsNotRespectRequirements)))       
+        self.LogAndPrint(" %s %s" % ("posts.score < 10|",len(self.postsNotHaveScore)))
+        self.LogAndPrint(" %s %s" % ("posts = youtube|",len(self.postsAreYoubube)))
+        self.LogAndPrint(" %s %s" % ("posts != youbube|",len(self.postsAreNotYoubube)))
+        self.LogAndPrint(" %s %s" % ("title = track|",len(self.postsTitleMatch)))
+        self.LogAndPrint(" %s %s" % ("title != track|",len(self.postsTitleNotMatch)))
+        self.LogAndPrint(" %s %s" % ("tracks can be add|",len(self.tracksCanBeAddToPlaylist)))
+        self.LogAndPrint(" %s %s" % ("tracks added|",len(self.tracksAddedToPlaylist)))
+        self.LogAndPrint(" %s %s" % ("tracks already exist|",len(self.tracksAlReadyExist)))
+        self.LogAndPrint(" %s %s" % ("post with errors|",len(self.postWithErrors)))
+        self.LogAndPrint(" %s %s" % ("tracks in double|",len(self.playlistTracksDouble)))
 
     def printRequirements(self):
-        print("#REQUIREMENTS:")
-        print("-----------------------------------------------------------------------")
-        print("Current post not rearch score of "+str(self.scoreToReach))
+        self.LogAndPrint("#REQUIREMENTS:")
+        self.LogAndPrint("-----------------------------------------------------------------------")
+        self.LogAndPrint("Current post not rearch score of "+str(self.scoreToReach))
         for requireScore in self.postsNotHaveScore:
             try:
-                print('%s\n' % requireScore.title)
+                self.LogAndPrint('%s\n' % requireScore.title)
             except:
-                print('%s\n' % str(requireScore.title).encode())
-        print("\n")
-        print("Current post which url not match youtube ")
+                self.LogAndPrint('%s\n' % str(requireScore.title).encode())
+        self.LogAndPrint("\n")
+        self.LogAndPrint("Current post which url not match youtube ")
         for requireTrack in self.postsAreNotYoubube:
             try:
-                print('%s\n' % requireTrack.title)
+                self.LogAndPrint('%s\n' % requireTrack.title)
             except:
-                print('%s\n' % str(requireTrack.title).encode())
+                self.LogAndPrint('%s\n' % str(requireTrack.title).encode())
 
     def printErrors(self):
-        print("#ERRORS:")
-        print("-----------------------------------------------------------------------")
-        for errors in self.postWithErros:
+        self.ErrorsAndPrint("#ERRORS: "+self.playlistSubredditName)
+        self.ErrorsAndPrint("-----------------------------------------------------------------------")
+        for errors in self.postWithErrors:
             try:
-                print('%s\n' % errors["error"])
+                self.ErrorsAndPrint('%s\n' % errors["error"])
             except:
-                print('%s\n' % str(errors["error"]).encode())
+                self.ErrorsAndPrint('%s\n' % str(errors["error"]).encode())
 
-    def printPlaylist(self,playlist_name): 
+    def printPlaylistContent(self,playlist_name): 
         playlistTracks = self.getPlaylistTracks(playlist_name)
-        print("#PLAYLIST CONTENT:")
-        print("-----------------------------------------------------------------------")
-        print("Current playlist tracks (title) (len:"+str(len(playlistTracks))+")")
+        self.LogAndPrint("#PLAYLIST CONTENT: "+self.playlistSubredditName)
+        self.LogAndPrint("-----------------------------------------------------------------------")
+        self.LogAndPrint("Current playlist tracks (title) (len:"+str(len(playlistTracks))+")")
         for i, item in enumerate(playlistTracks):
             track = item['track']
             try:
-                print(" %2.5s %1s - %1s" % (i, track['artists'][0]['name'],track['name']))
+                self.LogAndPrint(" %2.5s %1s - %1s" % (i, track['artists'][0]['name'],track['name']))
             except:
-                print(" %2.5s %1s - %1s" % (i, track['artists'][0]['name'].encode(),track['name'].encode()))
+                self.LogAndPrint(" %2.5s %1s - %1s" % (i, track['artists'][0]['name'].encode(),track['name'].encode()))
 
     def printDoubleTest(self,playlist_name):
         
-        print("#DOUBLE:")
-        print("-----------------------------------------------------------------------")
+        self.LogAndPrint("#DOUBLE:")
+        self.LogAndPrint("-----------------------------------------------------------------------")
         for track in self.playlistTracksDouble:
-            print("%0s (%0s) " % (track['name'],track['uri']))
+            self.LogAndPrint("%0s (%0s) " % (track['name'],track['uri']))
+
+    def LogAndPrint(self,message):
+        print(message)
+        self.logs = self.logs+message+"\n"
+
+    def ErrorsAndPrint(self,message):
+        if self.terminalErrors:
+            print(message)
+        self.errors = self.errors+message+"\n"
+
+
 main = Main()
