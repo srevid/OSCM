@@ -50,12 +50,12 @@ class Main:
         with open(self.logFilePath, "a") as logsFile:
             logsFile.write("***********************************************************************\n")
             logsFile.write("**** END OF MAIN PROCESS \n")
-            logsFile.write("**** DATE:"+self.dateTimeNow.strftime("%m/%d/%Y")+"\n")
+            logsFile.write("**** DATE:"+self.dateTimeNow.strftime("%m/%d/%Y %H:%M:%S")+"\n")
             logsFile.write("***********************************************************************\n")
         with open(self.errorsFilePath, "a") as errorsFile:
             errorsFile.write("***********************************************************************\n")
             errorsFile.write("**** END OF MAIN PROCESS \n")
-            errorsFile.write("**** DATE:"+self.dateTimeNow.strftime("%m/%d/%Y")+"\n")
+            errorsFile.write("**** DATE:"+self.dateTimeNow.strftime("%m/%d/%Y %H:%M:%S")+"\n")
             errorsFile.write("***********************************************************************\n")
 
     
